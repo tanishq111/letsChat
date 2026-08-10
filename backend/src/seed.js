@@ -18,6 +18,9 @@ const seedData = async () => {
     { username: "Sara",  email: "sara@test.com",  password: "temp123" },
   ]);
 
+
+  // bcryptjs -> temp1123 -> hash function -> skrjnwkrjwikeiwqeiwuehwuie
+
   } catch (error) {
     console.error("Error seeding data:", error);
   }

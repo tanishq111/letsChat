@@ -61,6 +61,7 @@
 
 import express from "express";
 import userRoutes from "./routes/user.routes.js"; // importing the user routes
+import authRoutes from "./routes/auth.routes.js"; // importing the auth routes
 import errorHandler from "./middlewares/errorHandler.js"; // importing the error handling middleware
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js"; // importing the database connection function
@@ -76,9 +77,7 @@ dotenv.config(); // loading environment variables from .env file
 
 app.use(express.json()); // middleware to parse incoming JSON requests // flagship feature of express -> middleware
 app.use("/user", userRoutes); // using the user routes with a prefix of /api
-// route
-// route
-// route
+app.use("/api/auth", authRoutes); // using the auth routes with a prefix of /api
 
 
 // middleware to handle 404 errors (no route found errors)

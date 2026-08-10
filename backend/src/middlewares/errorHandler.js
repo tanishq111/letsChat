@@ -7,3 +7,7 @@ const errorHandler = (err, req, res, next) => {
 };
 
 export default errorHandler;
+
+
+
+//HW -> how to use this errorHandler.js in server.js and how to use it in routes and controllers

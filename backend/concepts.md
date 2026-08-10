@@ -19,6 +19,14 @@ cors()  ──▶ express.json() ──▶ logger ──▶ matching route/contr
 
 
 
+```
+WITHOUT SALT                          WITH SALT
+────────────                          ─────────
+hash("password123") = 9x8f...         hash("password123" + "aB3$") = 4kd9wrruheiruheiruheiurheiurheiuhqnwqjhqjuwh
+hash("password123") = 9x8f...         hash("password123" + "Zq7!") = p0w2wiehuweyhwyuehuwyerhuwyhuyrwuyerhuwrjuwh
+   ↑ identical → crackable               ↑ different every time → safe
+```
+
 
 
 
@@ -72,4 +80,58 @@ user
                        │  text    │
                        │  status  │
                        └──────────┘
+```
+
+
+
+How the token works
+
+
+```
+1. Login (email+password)  ──────────▶  Server verifies, SIGNS a token
+2. Server sends token back  ◀──────────
+3. Every later request carries the token ──▶ Server VERIFIES it → "yep, it's Aisha"
+```
+
+
+
+JWT Token
+
+```
+   header  .  payload  .  signature
+   eyJhbG  .  eyJpZCI  .  SflKxwRJ...
+```
+
+Draw and explain each part:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ HEADER    { "alg": "HS256", "typ": "JWT" }                │  which algorithm
+├─────────────────────────────────────────────────────────┤
+│ PAYLOAD   { "id": "665f...", "iat": ..., "exp": ... }     │  the CLAIMS (data)
+├─────────────────────────────────────────────────────────┤
+│ SIGNATURE HMAC( header + payload , SECRET )               │  the tamper-proof seal
+└─────────────────────────────────────────────────────────┘
+```
+
+
+
+
+```
+signature = HMAC_SHA256(
+    base64url(header) + "." + base64url(payload),
+    JWT_SECRET
+)
+
+full token = base64url(header) . base64url(payload) . base64url(signature)
+```
+
+
+
+
+```
+Request ─▶ [ authMiddleware ] ─▶ controller
+              │ valid token?
+              ├─ yes → attach req.user, next()
+              └─ no  → 401, stop here
 ```
