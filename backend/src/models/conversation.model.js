@@ -12,7 +12,7 @@ const conversationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Message"
   }
-}, {timestamps: true});
+}, {timestamps: true, strict: false}); // Allowing additional fields in the schema
 
 const Conversation = mongoose.model("Conversation", conversationSchema);
 

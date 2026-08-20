@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import { generateToken } from "../utils/tokenhelper.js";
 
  const registerUser = async (req, res) => {
+  console.log("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTregister request body:", req.body);
   try {
     const { username, email, password } = req.body;
  
@@ -26,6 +27,7 @@ import { generateToken } from "../utils/tokenhelper.js";
 
 
  const loginUser = async (req, res) => {
+  console.log("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTLogin request body:", req.body); // Log the request body to see what is being sent
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -33,6 +35,7 @@ import { generateToken } from "../utils/tokenhelper.js";
     }
 
     const user = await User.findOne({ email });
+     console.log("User found:", user); // Log the user object to see if it was found
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -43,6 +46,7 @@ import { generateToken } from "../utils/tokenhelper.js";
     }
 
     const token = generateToken(user);
+    console.log("Generated token:", token); // Log the generated token to verify it's being created correctly
     res.status(200).json({ message: "User logged in successfully",
         "User": {
             "username": user.username,

@@ -135,3 +135,26 @@ Request ─▶ [ authMiddleware ] ─▶ controller
               ├─ yes → attach req.user, next()
               └─ no  → 401, stop here
 ```
+
+
+
+Prop Drilling
+
+
+         App (has user data)
+           │
+       ┌───┴────┐
+    Navbar    ChatPage
+                │
+           ┌───┴────┐
+        Sidebar   MessageList
+                      │
+                   MessageItem ← needs user data too
+
+
+```
+App stored some data in to context
+all the components that are consuming the value from the context -> will be re rendered if context gets updated
+```
+
+
