@@ -1,6 +1,7 @@
 import { MessageCircleMore } from "lucide-react";
 import { useChat } from "../context/chatContext.jsx";
 import { useAuth } from "../context/authContext.jsx";
+import MessageList from "./Message.List.jsx";
 
 const ChatWindow = () => {
   const { activeConversation } = useChat();
@@ -42,11 +43,7 @@ const ChatWindow = () => {
         </div>
       </header>
 
-      <div className="flex flex-1 items-center justify-center bg-canvas px-6 text-center">
-        <p className="text-sm text-muted">
-          Conversation opened. Messaging comes next class.
-        </p>
-      </div>
+      <MessageList />
     </section>
   );
 };

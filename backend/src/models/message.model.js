@@ -23,8 +23,9 @@ const messageSchema = new mongoose.Schema({
         type: String,
         enum: ["sent", "delivered", "read"],
         default: "sent"
-      }
-});
+      },
+
+}, {timestamps: true});
 
 
 const Message = mongoose.model("Message", messageSchema);

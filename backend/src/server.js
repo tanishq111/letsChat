@@ -71,6 +71,7 @@ dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dns.setDefaultResultOrder("ipv4first");
 import conversationRoutes from "./routes/conversation.route.js"; // importing the conversation routes
 import userSearchRoutes from "./routes/user.search.routes.js"; // importing the user search routes
+import messageRoutes from "./routes/messages.routes.js"; // importing the message routes
 
 const app = express(); // creating an instance of the express application
 
@@ -87,6 +88,7 @@ app.use("/user", userRoutes); // using the user routes with a prefix of /api
 app.use("/api/auth", authRoutes); // using the auth routes with a prefix of /api
 app.use("/api/conversations", conversationRoutes); // using the conversation routes with a prefix of /api
 app.use("/api/search", userSearchRoutes); // using the user search routes with a prefix of /api
+app.use("/api/messages", messageRoutes); // using the message routes with a prefix of /api
 
 // middleware to handle 404 errors (no route found errors)
 app.use((req, res, next) => {
