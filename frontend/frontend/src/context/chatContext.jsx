@@ -1,18 +1,30 @@
-import {useState, useEffect, createContext, useCallback, useContext} from "react";
+import {useState, useEffect, useRef, createContext, useCallback, useContext} from "react";
+import {connectSocket, getSocket, disconnectSocket} from "../socket/socket.js";
 import {api} from "../api/axios";
 export const ChatContext = createContext();
 export const ChatProvider = ({ children }) => {
       const [conversations, setConversations] = useState([]);
-      console.log("Conversations in ChatProvider:", conversations);
       const [activeConversation, setActiveConversation] = useState(null);
-      console.log("Active Conversation in ChatProvider:", activeConversation);
-
       const [messages, setMessages] = useState([]);
-      console.log("Messages in ChatProvider:", messages);
-
       const [loadingMessages, setLoadingMessages] = useState(false);
+      const [onlineUserIds,setOnlineUserIds] = useState([]);
       
-      
+      const handleDisconnect = () => {
+        console.log("Socket disconnected, clearing messages...");
+        setOnlineUserIds([]);
+      }
+
+      const conversationRef = useRef(null);
+      useEffect(() => {
+        conversationRef.current = conversations;
+      }, [conversations]);
+
+      // keep the open conversation readable inside the long-lived socket callback
+      const activeConversationRef = useRef(null);
+      useEffect(() => {
+        activeConversationRef.current = activeConversation;
+      }, [activeConversation]);
+
       const loadConversations = useCallback(async () => {
         try {
           const response = await api.get("/api/conversations");
@@ -21,13 +33,16 @@ export const ChatProvider = ({ children }) => {
              }
       }, []);
 
-      // whenever the activeConversation changes, we want to load the messages for that conversation
+      useEffect(() => {
+        loadConversations();
+      }, [loadConversations]);
 
+      // whenever the activeConversation changes, load that conversation's messages
       useEffect(() => {
         if(!activeConversation){
            setMessages([]);
             return;
-        } 
+        }
 
         setLoadingMessages(true);
         const fetchMessages = async () => {
@@ -44,11 +59,68 @@ export const ChatProvider = ({ children }) => {
         fetchMessages();
       }, [activeConversation]);
 
-
-
       useEffect(() => {
-        loadConversations();
-      }, [loadConversations]);
+        const token = localStorage.getItem("token");
+        if(!token) return;
+        const socket = connectSocket(token);
+
+        const handleNewMessage = (message) => {
+            const open = activeConversationRef.current;
+            if(open && message.conversation === open._id) {
+                setMessages((prevMessages) =>
+                    prevMessages.some((m) => m._id === message._id)
+                        ? prevMessages
+                        : [...prevMessages, message]
+                );
+            }
+
+            // for al the conversations, update the lastMessage if the new message belongs to that conversation
+            const kwownConversations = conversationRef.current.some(c => c._id === message.conversation);
+            if(!kwownConversations) {
+                loadConversations();
+                return;
+            }
+            // update the sidebar preview + float that chat to the top
+            setConversations((prev) => {
+                const idx = prev.findIndex((c) => c._id === message.conversation);
+                if(idx === -1) return prev;
+                const updated = { ...prev[idx], lastMessage: message };
+                const rest = prev.filter((c) => c._id !== message.conversation);
+                return [updated, ...rest];
+            });
+        };
+
+        const handleOnlineUsersUpdate = (id) => {
+        setOnlineUserIds(id);
+        };
+
+        const handleReconnect = () => {
+            console.log("Socket reconnected, reloading conversations...");
+            const open = activeConversationRef.current;
+            if(open) {
+                api.get(`/api/messages/${open._id}`)
+                    .then((response) => {
+                        setMessages(response.data);
+                    })
+                    .catch((error) => {
+                        console.error("Error fetching messages after reconnect:", error);
+                    });
+            }
+        };
+
+        socket.on("message:new", handleNewMessage);
+        socket.on("users:online", handleOnlineUsersUpdate);
+        socket.on("disconnect", handleDisconnect);
+        socket.io.on("reconnect", handleReconnect); // reconnect event is emitted by the underlying socket.io client when it successfully reconnects
+    
+
+        return () => {
+            socket.off("message:new", handleNewMessage);
+            socket.off("users:online", handleOnlineUsersUpdate);
+            socket.off("disconnect", handleDisconnect);
+            disconnectSocket();
+        };
+      }, []);
 
       const openConversationWith = async (userId) => {
           try{
@@ -67,23 +139,28 @@ export const ChatProvider = ({ children }) => {
             }
       }
 
-    
       const sendMessage = async (text) => {
         try {
             if(!activeConversation) {
                 throw new Error("No active conversation selected");
             }
-            const response = await api.post("/api/messages", { conversationId: activeConversation._id, text });
-            const newMessage = response.data;
-            setMessages((prevMessages) => [...prevMessages, newMessage]);
-            // trigger massgae update in the UI
-            return newMessage;
+            const socket = getSocket();
+            if(!socket) return;
+            socket.emit("message:send", {
+                conversationId: activeConversation._id,
+                text: text.trim(),
+            });
         } catch (error) {
             console.error("Error sending message:", error);
         }
+      }; 
+
+      const isUserOnline = (userId) => {
+        return onlineUserIds.includes(userId);
       };
+      
       return (
-          <ChatContext.Provider value={{ conversations, activeConversation, loadConversations, setActiveConversation, openConversationWith ,sendMessage, messages, loadingMessages  }}>
+          <ChatContext.Provider value={{ conversations, activeConversation, loadConversations, setActiveConversation, openConversationWith, sendMessage, messages, loadingMessages, isUserOnline }}>
               {children}
           </ChatContext.Provider>
       );

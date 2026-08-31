@@ -5,6 +5,6 @@ import { protect } from "../middlewares/auth.middleware.js";
 const router = express.Router();
 
 router.post("/", protect, getOrCreateConversation);
-router.get("/:conversationId", protect, getConversations);
+router.get("/", protect, getConversations);
 
 export default router;

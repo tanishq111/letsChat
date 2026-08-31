@@ -4,7 +4,7 @@ import Conversation from '../models/conversation.model.js';
 
 export const sendMessage = async (req, res) => {
      try{
-        console.log("Request Body:", req.body);
+        console.log("Request Body SendMessage:", req.body);
         const { conversationId, text } = req.body;
         if(!conversationId  || !text) {
             return res.status(400).json({ message: "All fields are required" });
@@ -15,7 +15,7 @@ export const sendMessage = async (req, res) => {
             return res.status(404).json({ message: "Conversation not found" });
         }
         // HomeWork -> add a security thing here to check if sender/receiver is a participant of the conversation. If not then return 403 forbidden error
-
+        console.log("Conversation found:", conversation);
         const message = new Message({ conversation: conversationId, sender: req.user._id, text });
         await message.save();
 

@@ -2,9 +2,10 @@ import { MessageCircleMore } from "lucide-react";
 import { useChat } from "../context/chatContext.jsx";
 import { useAuth } from "../context/authContext.jsx";
 import MessageList from "./Message.List.jsx";
+import MessageInput from "./MessageInput.jsx";
 
 const ChatWindow = () => {
-  const { activeConversation } = useChat();
+  const { activeConversation, isUserOnline } = useChat();
   const { user: me } = useAuth();
 
   if (!activeConversation) {
@@ -37,6 +38,17 @@ const ChatWindow = () => {
         <div className="grid size-10 place-items-center rounded-full bg-brand font-display text-sm font-bold text-white">
           {other?.username?.[0]?.toUpperCase()}
         </div>
+        <div className="flex items-center gap-2">
+            <span
+              className={`inline-block size-2.5 rounded-full ${
+                isUserOnline(other?._id) ? "bg-green-500" : "bg-red-300"
+              }`}
+              aria-hidden="true"
+            />
+            <p className="mt-0.5 text-sm text-muted">
+              {isUserOnline(other?._id) ? "Online" : "Offline"}
+            </p>
+        </div>
         <div>
           <h1 className="font-display text-lg font-bold text-ink">{other?.username}</h1>
           <p className="mt-0.5 text-sm text-muted">{other?.email}</p>
@@ -44,6 +56,7 @@ const ChatWindow = () => {
       </header>
 
       <MessageList />
+      <MessageInput />
     </section>
   );
 };

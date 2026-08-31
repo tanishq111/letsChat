@@ -9,12 +9,11 @@ export const getOrCreateConversation = async (req, res) => {
         console.log("Current User ID:", currentUserId);
          
         let conversation = await conversationModel.findOne({
-            members: { $all: [currentUserId, requestedUserId] , $size: 2 }
+            participants: { $all: [currentUserId, requestedUserId] , $size: 2 }
         }).populate("participants", "-password"); // Exclude the password field from the participants
         
         if (!conversation) {
             conversation = new conversationModel({
-                members: [currentUserId, requestedUserId],
                 participants: [currentUserId, requestedUserId]
             });
             await conversation.save();

@@ -61,10 +61,13 @@
 
 import express from "express";
 import cors from "cors";
+import http from "http";
+import { Server } from "socket.io"; // importing the socket.io server class
 import userRoutes from "./routes/user.routes.js"; // importing the user routes
 import authRoutes from "./routes/auth.routes.js"; // importing the auth routes
 import errorHandler from "./middlewares/errorHandler.js"; // importing the error handling middleware
 import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
 import { connectDB } from "./config/db.js"; // importing the database connection function
 import dns from "dns";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -72,11 +75,103 @@ dns.setDefaultResultOrder("ipv4first");
 import conversationRoutes from "./routes/conversation.route.js"; // importing the conversation routes
 import userSearchRoutes from "./routes/user.search.routes.js"; // importing the user search routes
 import messageRoutes from "./routes/messages.routes.js"; // importing the message routes
+import Message from "./models/message.model.js";
+import Conversation from "./models/conversation.model.js";
 
 const app = express(); // creating an instance of the express application
 
 
 dotenv.config(); // loading environment variables from .env file
+
+const server = http.createServer(app); // creating an HTTP server using the express app
+const io = new Server(server, {
+  cors: {
+    origin: "*", // allow requests from any origin
+  },
+}); // creating a new instance of the socket.io server and passing the HTTP server and CORS options
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error("Authentication error"));
+  }
+  try {
+    const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
+    socket.userId = decodedToken.id; // attaching the user ID to the socket object for later use
+    socket.username = decodedToken.username; // attaching the username to the socket object for later use
+    next();
+  } catch (error) {
+    next(new Error("Authentication error"));
+  }
+});
+
+const onlineUsers = new Map();
+const broadcastOnlineUsers = () => {
+  const onlineUserIds = [...onlineUsers.keys()];
+  io.emit("users:online", onlineUserIds);
+}
+
+io.on("connection", (socket) => {
+  console.log("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT");
+  // who ever wants to connect to the socket server will be authenticated using the JWT token and if the token is valid, the user ID and username will be attached to the socket object for later use
+    console.log(`User connected: ${socket.userId} (${socket.username})`);
+    socket.join(socket.userId); // joining the user to a room with their user ID so that we can send messages to them later
+
+    onlineUsers.set(socket.userId, (onlineUsers.get(socket.userId) || 0) + 1);
+    broadcastOnlineUsers();
+    socket.on("message:send", async ({ conversationId, text }) => {
+      try {
+         if(!conversationId || !text) {
+            socket.emit("message:error", { message: "All fields are required" });
+            return;
+        }
+        const conversation = await Conversation.findById(conversationId);
+        if(!conversation) {
+            socket.emit("message:error", { message: "Conversation not found" });
+            return;
+        }
+
+        const isParticipant = conversation.participants.some(participantId => participantId.toString() === socket.userId.toString());
+
+         if(!isParticipant) {
+            socket.emit("message:error", { message: "You are not a participant of this conversation" });
+            return;
+        }
+
+        const message = new Message({ conversation: conversationId, sender: socket.userId, text });
+        await message.save();
+
+        conversation.lastMessage = message._id;
+        await conversation.save();
+
+        conversation.participants.forEach(participantId => {
+          console.log(`EEEEEEEEEEEEmitting message:new to participant: ${participantId.toString()}`);
+            io.to(participantId.toString()).emit("message:new", message);
+        });
+      }catch (error) {
+        console.error("Error sending message via socket:", error);
+        socket.emit("message:error", { message: "Internal server error" });
+      }
+
+    });
+
+
+    socket.on("disconnect", () => {
+      console.log(`User disconnected: ${socket.userId} (${socket.username})`);
+      const currentCount = onlineUsers.get(socket.userId) || 0;
+      if (currentCount <= 1) {
+        onlineUsers.delete(socket.userId);
+      } else {
+        onlineUsers.set(socket.userId, currentCount - 1);
+      }
+      broadcastOnlineUsers();
+    });
+});
+
+
+app.set("io", io); // setting the socket.io instance on the express app so that it can be accessed in other parts of the application  
+
+ // creating a map to store the online users and their socket IDs
 
 
 app.use(express.json()); // middleware to parse incoming JSON requests // flagship feature of express -> middleware
@@ -97,6 +192,6 @@ app.use((req, res, next) => {
 
 app.use(errorHandler); // using the centralized error handling middleware
 connectDB(); // connecting to the database
-app.listen(3000, () => {
-  console.log(`Server is running on http://localhost:${process.env.PORT}`);
+  server.listen(3000, () => {
+  console.log(`Server is running on http://localhost:3000`);
 });
