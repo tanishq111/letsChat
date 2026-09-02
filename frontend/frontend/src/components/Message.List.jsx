@@ -30,6 +30,7 @@ const MessageList = () => {
     );
   }
 
+  //HW  how you will show the double tick for the delivered message in the chat application?
   return (
     <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-6 py-6 lg:px-9">
       {messages.map((m) => {
@@ -41,7 +42,7 @@ const MessageList = () => {
             <div
               className={`max-w-[75%] rounded-[12px] px-4 py-2 text-sm leading-6 ${
                 mine
-                  ? "bg-brand text-white rounded-br-[3px]"
+                  ? "bg-brand text-white rounded-br-[3px] relative"
                   : "bg-white text-ink border border-line rounded-bl-[3px]"
               }`}
             >

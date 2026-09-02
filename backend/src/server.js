@@ -58,6 +58,9 @@
 // });
 
 
+// is typing indicator feature for the chat application
+// arrange the code
+
 
 import express from "express";
 import cors from "cors";
@@ -109,9 +112,10 @@ const onlineUsers = new Map();
 const broadcastOnlineUsers = () => {
   const onlineUserIds = [...onlineUsers.keys()];
   io.emit("users:online", onlineUserIds);
+  
 }
 
-io.on("connection", (socket) => {
+io.on("connection", async(socket) => {
   console.log("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT");
   // who ever wants to connect to the socket server will be authenticated using the JWT token and if the token is valid, the user ID and username will be attached to the socket object for later use
     console.log(`User connected: ${socket.userId} (${socket.username})`);
@@ -119,6 +123,39 @@ io.on("connection", (socket) => {
 
     onlineUsers.set(socket.userId, (onlineUsers.get(socket.userId) || 0) + 1);
     broadcastOnlineUsers();
+
+    try{
+      const myConversations = await Conversation.find({ participants: socket.userId }).select("_id").lean();
+      const pendingMessages = await Message.find({
+        conversation: { $in: myConversations.map(c => c._id) },
+        sender: { $ne: socket.userId },
+        deliveredTo: { $ne: socket.userId },
+      }).select("_id sender").lean();
+
+      if(pendingMessages.length > 0) {
+        const messageIds = pendingMessages.map(m => m._id);
+        await Message.updateMany(
+          { _id: { $in: messageIds } },
+          { status: "delivered", $addToSet: { deliveredTo: socket.userId } }
+        );
+
+        // group the delivered message ids by their original sender
+        const messageIdsBySender = new Map();
+        pendingMessages.forEach(m => {
+          const senderId = m.sender.toString();
+          if(!messageIdsBySender.has(senderId)) messageIdsBySender.set(senderId, []);
+          messageIdsBySender.get(senderId).push(m._id.toString());
+        });
+
+        // notify each sender ONCE so their UI can show the double tick
+        messageIdsBySender.forEach((ids, senderId) => {
+          io.to(senderId).emit("message:delivered", { messageIds: ids, recipientId: socket.userId });
+        });
+      }
+    }catch (error) {
+        console.error("Error in connection handler:", error);
+    }
+
     socket.on("message:send", async ({ conversationId, text }) => {
       try {
          if(!conversationId || !text) {
@@ -131,10 +168,13 @@ io.on("connection", (socket) => {
             return;
         }
 
+
         const isParticipant = conversation.participants.some(participantId => participantId.toString() === socket.userId.toString());
 
          if(!isParticipant) {
             socket.emit("message:error", { message: "You are not a participant of this conversation" });
+            console.log(`User ${socket.userId} attempted to send a message to a conversation they are not a participant of: ${conversationId}`);
+
             return;
         }
 
@@ -144,10 +184,34 @@ io.on("connection", (socket) => {
         conversation.lastMessage = message._id;
         await conversation.save();
 
+      const participants = conversation.participants.map(participantId => participantId.toString()).filter(id => id !== socket.userId.toString()); // all other participants except the sender
+      const onlineParticipants = participants.filter(participantId => onlineUsers.has(participantId)); // all  participants who are online
+
+
+      console.log("original message:", message);
+            if(onlineParticipants.length > 0) {
+              console.log(`Adding deliveredTo for message ${message._id} to online participants: ${onlineParticipants.join(", ")}`);
+                await Message.findByIdAndUpdate(message._id, { 
+                  status: "delivered",
+                  $addToSet: { deliveredTo: { $each: onlineParticipants } } }); // we are not doign nay thing to this
+          }
+
+          const populatedMessage = await Message.findById(message._id).populate("sender", "username");
+          console.log(`Populated message: ${JSON.stringify(populatedMessage)}`);  
+        //we are sending the message to all participants
         conversation.participants.forEach(participantId => {
           console.log(`EEEEEEEEEEEEmitting message:new to participant: ${participantId.toString()}`);
-            io.to(participantId.toString()).emit("message:new", message);
+            io.to(participantId.toString()).emit("message:new", populatedMessage);
         });
+
+        // sending the message as delivered to all online participants
+        const sender = await Message.findById(message._id).populate("sender", "username");
+        // onlineParticipants.forEach(participantId => {
+        //     if(onlineUsers.has(participantId)) {
+        //         io.to(participantId.toString()).emit("message:new", { messageId: message._id, deliveredTo: participantId });
+        //     }
+        // });
+
       }catch (error) {
         console.error("Error sending message via socket:", error);
         socket.emit("message:error", { message: "Internal server error" });

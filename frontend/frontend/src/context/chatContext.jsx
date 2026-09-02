@@ -91,8 +91,17 @@ export const ChatProvider = ({ children }) => {
         };
 
         const handleOnlineUsersUpdate = (id) => {
-        setOnlineUserIds(id);
+        setOnlineUserIds(id); // from here we can emit something
         };
+
+        const handleMessageDelivered = ({messageIds}) => {
+                const idsSet = new Set(messageIds);
+                setMessages((prevMessages) =>
+                    prevMessages.map((m) =>
+                        idsSet.has(m._id) && m.status === "sent" ? { ...m, status: "delivered" } : m
+                    )
+                );
+        }
 
         const handleReconnect = () => {
             console.log("Socket reconnected, reloading conversations...");
@@ -111,6 +120,7 @@ export const ChatProvider = ({ children }) => {
         socket.on("message:new", handleNewMessage);
         socket.on("users:online", handleOnlineUsersUpdate);
         socket.on("disconnect", handleDisconnect);
+        socket.on("message:delivered", handleMessageDelivered); // this is for fronted change to make double tick appea
         socket.io.on("reconnect", handleReconnect); // reconnect event is emitted by the underlying socket.io client when it successfully reconnects
     
 
@@ -118,6 +128,7 @@ export const ChatProvider = ({ children }) => {
             socket.off("message:new", handleNewMessage);
             socket.off("users:online", handleOnlineUsersUpdate);
             socket.off("disconnect", handleDisconnect);
+            socket.off("message:delivered", handleMessageDelivered);
             disconnectSocket();
         };
       }, []);
@@ -160,7 +171,7 @@ export const ChatProvider = ({ children }) => {
       };
       
       return (
-          <ChatContext.Provider value={{ conversations, activeConversation, loadConversations, setActiveConversation, openConversationWith, sendMessage, messages, loadingMessages, isUserOnline }}>
+          <ChatContext.Provider value={{ conversations, activeConversation, loadConversations, setActiveConversation, openConversationWith, sendMessage, messages, loadingMessages, isUserOnline ,handleMessageDelivered}}>
               {children}
           </ChatContext.Provider>
       );
