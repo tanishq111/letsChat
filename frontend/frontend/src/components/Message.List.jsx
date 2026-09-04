@@ -3,6 +3,17 @@ import { useChat } from "../context/chatContext.jsx";
 import { useAuth } from "../context/authContext.jsx";
 
 
+const Ticks = ({status}) => {
+   console.log(status);
+     const label = status === "sent" ? "Delivered" : "Read";
+     const glyph = status === "sent" ? "✓" : "✓✓";
+     const color = status === "sent" ? "text-white" : "text-white-500";
+     return (
+       <span title={label} className={`ml-1 text-xs ${color}`}>
+         {glyph}
+       </span>
+     );
+}
 
 const MessageList = () => {
   const { messages, loadingMessages } = useChat();
@@ -32,6 +43,7 @@ const MessageList = () => {
 
   //HW  how you will show the double tick for the delivered message in the chat application?
   return (
+    
     <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-6 py-6 lg:px-9">
       {messages.map((m) => {
         // sender may be a populated object OR a raw id — handle both
@@ -47,6 +59,7 @@ const MessageList = () => {
               }`}
             >
               {m.text}
+              {mine && <Ticks status={m.status} />}
             </div>
           </div>
         );

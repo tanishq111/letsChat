@@ -5,8 +5,9 @@ import MessageList from "./Message.List.jsx";
 import MessageInput from "./MessageInput.jsx";
 
 const ChatWindow = () => {
-  const { activeConversation, isUserOnline } = useChat();
+  const { activeConversation, isUserOnline,typingUserFor } = useChat();
   const { user: me } = useAuth();
+  const typingUser = typingUserFor(activeConversation?._id); //HW get the name of the user who is typing
 
   if (!activeConversation) {
     return (
@@ -56,6 +57,18 @@ const ChatWindow = () => {
       </header>
 
       <MessageList />
+
+
+{typingUser && (
+  <div className="flex items-center gap-2 px-6 py-1 text-sm italic text-gray-500">
+    <span className="flex gap-1">
+      <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
+    </span>
+    {typingUser} is typing…
+  </div>
+)}
       <MessageInput />
     </section>
   );

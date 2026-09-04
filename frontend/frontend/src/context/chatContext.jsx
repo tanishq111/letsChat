@@ -1,13 +1,44 @@
 import {useState, useEffect, useRef, createContext, useCallback, useContext} from "react";
 import {connectSocket, getSocket, disconnectSocket} from "../socket/socket.js";
 import {api} from "../api/axios";
+
 export const ChatContext = createContext();
+
 export const ChatProvider = ({ children }) => {
       const [conversations, setConversations] = useState([]);
       const [activeConversation, setActiveConversation] = useState(null);
       const [messages, setMessages] = useState([]);
       const [loadingMessages, setLoadingMessages] = useState(false);
       const [onlineUserIds,setOnlineUserIds] = useState([]);
+      const [typingByConversation, setTypingByConversation] = useState({});
+      const typingExpireTimeouts = useRef({});
+
+      const clearTyping = (conversationId) => {
+          setTypingByConversation((prev) => {
+              const updated = { ...prev };
+              delete updated[conversationId];
+              return updated;
+          });
+      };
+
+      const handleTyping = ({conversationId, userId}) => {
+          setTypingByConversation((prev) => ({
+              ...prev,
+              [conversationId]: userId,
+          }));
+
+          clearTimeout(typingExpireTimeouts.current[conversationId]);
+          typingExpireTimeouts.current[conversationId] = setTimeout(() => {
+              clearTyping(conversationId);
+          }, 3000); // clear typing indicator after 3 seconds
+      }
+
+
+      const handleStopTyping = ({conversationId, userId}) => {
+          clearTimeout(typingExpireTimeouts.current[conversationId]);
+          clearTyping(conversationId);
+      };
+      
       
       const handleDisconnect = () => {
         console.log("Socket disconnected, clearing messages...");
@@ -120,6 +151,8 @@ export const ChatProvider = ({ children }) => {
         socket.on("message:new", handleNewMessage);
         socket.on("users:online", handleOnlineUsersUpdate);
         socket.on("disconnect", handleDisconnect);
+        socket.on("typing", handleTyping);
+        socket.on("stopTyping", handleStopTyping);
         socket.on("message:delivered", handleMessageDelivered); // this is for fronted change to make double tick appea
         socket.io.on("reconnect", handleReconnect); // reconnect event is emitted by the underlying socket.io client when it successfully reconnects
     
@@ -129,6 +162,9 @@ export const ChatProvider = ({ children }) => {
             socket.off("users:online", handleOnlineUsersUpdate);
             socket.off("disconnect", handleDisconnect);
             socket.off("message:delivered", handleMessageDelivered);
+            socket.off("typing", handleTyping);
+            socket.off("stopTyping", handleStopTyping);
+            socket.off("reconnect", handleReconnect);
             disconnectSocket();
         };
       }, []);
@@ -169,9 +205,14 @@ export const ChatProvider = ({ children }) => {
       const isUserOnline = (userId) => {
         return onlineUserIds.includes(userId);
       };
+
+        const typingUserFor = (conversationId) => {
+    if (!conversationId) return null;
+    return typingByConversation[conversationId] || null;
+  };
       
       return (
-          <ChatContext.Provider value={{ conversations, activeConversation, loadConversations, setActiveConversation, openConversationWith, sendMessage, messages, loadingMessages, isUserOnline ,handleMessageDelivered}}>
+          <ChatContext.Provider value={{ conversations, activeConversation, loadConversations, setActiveConversation, openConversationWith, sendMessage, messages, loadingMessages, isUserOnline, typingUserFor }}>
               {children}
           </ChatContext.Provider>
       );

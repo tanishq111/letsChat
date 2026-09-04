@@ -115,6 +115,7 @@ const broadcastOnlineUsers = () => {
   
 }
 
+let lastTypingAt = 0;
 io.on("connection", async(socket) => {
   console.log("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT");
   // who ever wants to connect to the socket server will be authenticated using the JWT token and if the token is valid, the user ID and username will be attached to the socket object for later use
@@ -149,7 +150,7 @@ io.on("connection", async(socket) => {
 
         // notify each sender ONCE so their UI can show the double tick
         messageIdsBySender.forEach((ids, senderId) => {
-          io.to(senderId).emit("message:delivered", { messageIds: ids, recipientId: socket.userId });
+          io.to(senderId).emit("message:delivered", { messageIds: ids, recipientId: socket.userId }); // read receipts
         });
       }
     }catch (error) {
@@ -204,19 +205,52 @@ io.on("connection", async(socket) => {
             io.to(participantId.toString()).emit("message:new", populatedMessage);
         });
 
-        // sending the message as delivered to all online participants
-        const sender = await Message.findById(message._id).populate("sender", "username");
-        // onlineParticipants.forEach(participantId => {
-        //     if(onlineUsers.has(participantId)) {
-        //         io.to(participantId.toString()).emit("message:new", { messageId: message._id, deliveredTo: participantId });
-        //     }
-        // });
-
       }catch (error) {
         console.error("Error sending message via socket:", error);
         socket.emit("message:error", { message: "Internal server error" });
       }
 
+    });
+
+
+
+    socket.on("typing", async ({ conversationId }) => {
+      console.log(`User ${socket.userId} is typing in conversation ${conversationId}`);
+      const now = Date.now();
+    if (now - lastTypingAt < 1000) return; 
+    lastTypingAt = now;
+
+    const convo = await Conversation.findById(conversationId).select("participants").lean();
+    if (!convo) return;
+
+    convo.participants // why not only for online -> you can do it 
+      .map((p) => p.toString())
+      .filter((id) => id !== socket.userId.toString() && onlineUsers.has(id)) // everyone but the typer who is online
+      .forEach((id) =>
+        io.to(id).emit("typing", {
+          conversationId,
+          userId: socket.userId.toString(),
+          username: socket.username,
+        })
+      );
+    });
+  
+
+    socket.on("stopTyping", async ({ conversationId }) => {
+      console.log(`User ${socket.userId} stopped typing in conversation ${conversationId}`);
+      const convo = await Conversation.findById(conversationId).select("participants").lean();
+      if (!convo) return;
+
+      convo.participants
+        .map((p) => p.toString())
+        .filter((id) => id !== socket.userId.toString() && onlineUsers.has(id)) // everyone but the typer who is online
+        .forEach((id) =>
+          io.to(id).emit("stopTyping", {
+            conversationId,
+            userId: socket.userId.toString(),
+            username: socket.username,
+          })
+        );
     });
 
 
